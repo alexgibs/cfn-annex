@@ -1,0 +1,165 @@
+Parameters:
+
+  FunctionName:
+    Type: String
+    Default: cfn-annex
+  EnableDebug:
+    Type: String
+    Default: true
+    Description: Enable Lambda logging to CW
+
+Resources:
+
+  Lowercase:
+    Type: Custom::Lowercase
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: 
+            !Sub ${FunctionName}
+      fn: lowercase
+      input:
+        string: TESTING
+      debug: EnableDebug
+
+  Uppercase:
+    Type: Custom::Uppercase
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: 
+          !Sub ${FunctionName}
+      fn: uppercase
+      input:
+        string: testing
+      debug: EnableDebug
+
+  Split:
+    Type: Custom::Split
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: 
+          !Sub ${FunctionName}
+      fn: split
+      input:
+        string: ab-c--def-g-
+        delimiter: '-'
+      debug: EnableDebug
+
+  RemoveSingleChar:
+    Type: Custom::RemoveSingleChar
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: 
+          !Sub ${FunctionName}
+      fn: remove
+      input:
+        string: ab-c--def-g-
+        remove: '-'
+      debug: EnableDebug
+
+  RemoveMultiChars:
+    Type: Custom::RemoveMultiChars
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: 
+          !Sub ${FunctionName}
+      fn: remove
+      input:
+        string: ab-c--def-g-
+        remove:
+          - '-'
+          - 'd'
+          - 'a'
+      debug: EnableDebug
+
+  RandomChars:
+    Type: Custom::RandomChars
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: 
+          !Sub ${FunctionName}
+      fn: random
+      input:
+        length: 10
+      debug: EnableDebug
+
+  Pause:
+    Type: Custom::Pause
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: 
+          !Sub ${FunctionName}
+      fn: pause
+      input:
+        duration: 20000
+      debug: EnableDebug
+
+  DescribeCall:
+    Type: Custom::Describe
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: 
+          !Sub ${FunctionName}
+      fn: describe
+      input:
+        describe: CloudFormation.describeStackResource #will perform a describeStackResource API call
+        params:
+          StackName: !Ref AWS::StackName
+          LogicalResourceId: DescribeCall
+        responseKey: ResourceType
+      debug: EnableDebug
+
+  GetRootSnapshotIdFromAMI:
+    Type: Custom::Describe
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: 
+          !Sub ${FunctionName}
+      fn: describe
+      input:
+        describe: EC2.describeImages #will perform a describeStackResource API call
+        params:
+          ImageIds: 
+            - ami-1e299d7e
+        responseKey: Images.0.BlockDeviceMappings.0.Ebs.SnapshotId # .0. is used to access the first element in the array
+        # Because there is only 1 volume attached, we could just specify 'SnapshotId', without the full path. It will return the fist found.
+      debug: EnableDebug
+
+Outputs:
+  Lowercase:
+    Description: Value returned from Custom::Lowercase
+    Value: !GetAtt Lowercase.response
+  
+  Uppercase:
+    Description: Value returned from Custom::Uppercase
+    Value: !GetAtt Uppercase.response
+  
+  Split:
+    Description: Value returned from Custom::Split (displaying only the first value from the list)
+    Value: 
+      Fn::Select:
+        - 0
+        - !GetAtt Split.response
+
+  RemoveSingleChar:
+    Description: Value returned from Custom::RemoveSingleChar
+    Value: !GetAtt RemoveSingleChar.response
+
+  RemoveMultiChars:
+    Description: Value returned from Custom::RemoveMultiChars
+    Value: !GetAtt RemoveMultiChars.response
+
+  RandomChars:
+    Description: Value returned from Custom::RandomChars
+    Value: !GetAtt RandomChars.response
+
+  Pause:
+    Description: Value returned from Custom::Pause
+    Value: !GetAtt Pause.response
+
+  DescribeCall:
+    Description: Value returned from Custom::Describe (DescribeCall)
+    Value: !GetAtt DescribeCall.response
+
+  GetRootSnapshotIdFromAMI:
+    Description: Value returned from Custom::Describe (GetRootSnapshotIdFromAMI)
+    Value: !GetAtt GetRootSnapshotIdFromAMI.response
