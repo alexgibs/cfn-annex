@@ -28,9 +28,9 @@ cfn-annex adds functionality to CloudFormation, such as being able to split a st
 
 First, start by cloning this this repository.
 
-Installing the cfn-annex Lambda function can be done by the following two methods:
+Installing the cfn-annex Lambda function can be done either of the following methods:
 
-*Deploying it as part of a CloudFormation Stack:*
+**1. Deploying it as part of a CloudFormation Stack:**
 
   > Ensure you have npm and the aws cli installed.
 
@@ -38,7 +38,7 @@ Installing the cfn-annex Lambda function can be done by the following two method
   npm run deploy --s3bucket="mybucket" --stack-name="cfn-annex"
   ``
 
-*Deploying it directly as a Lambda function:*
+**2. Deploying it directly as a Lambda function:**
 
   - Zip the 'index.js' and 'cfn-response.js' files within the lambda_function folder.
   - Deploy as a NodeJS 4.3 Lambda function: http://docs.aws.amazon.com/lambda/latest/dg/nodejs-create-deployment-pkg.html
