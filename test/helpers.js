@@ -20,7 +20,7 @@ const responseStatusFAILED = 'FAILED';
 
 
 // Mock the Lambda invocation for testing
-const lambdaTest = (event) => {
+function lambdaTest(event) {
   return new Promise((resolve, reject) => {
     const execTime = lambdaExecTimeout || lambdaMaxTimeout;
     const timeNow = new Date().getTime();
@@ -51,7 +51,7 @@ const lambdaTest = (event) => {
 
     index[handler](event, context, callback);
   });
-};
+}
 
 function mockCustomResource(requestParams, responseParams) {
   const event = {

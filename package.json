@@ -4,10 +4,10 @@
   "description": "cfn-annex is a set of tested helper functions for AWS CloudFormation stacks, implemented as an AWS Lambda custom resource.",
   "main": "lambda_function/index.js",
   "scripts": {
-    "deploy": "aws cloudformation package --template-file cfn-annex.yml --s3-bucket $npm_config_s3bucket --output-template-file cfn-annex-deploy.yml && aws cloudformation deploy --template-file cfn-annex-deploy.yml --stack-name $npm_config_stackname --capabilities CAPABILITY_IAM",
-    "deploy:test": "aws cloudformation deploy --template-file test/test-template.yml --stack-name $npm_config_stackname --parameter-overrides FunctionName=cfn-annex EnableDebug=true",
+    "deploy": "aws cloudformation package --template-file cfn-annex.yml --s3-bucket $npm_config_s3bucket --output-template-file cfn-annex-deploy.yml && aws cloudformation deploy --template-file cfn-annex-deploy.yml --stack-name ${npm_config_stackname:=cfn-annex} --capabilities CAPABILITY_IAM",
+    "deploy:test": "aws cloudformation deploy --template-file test/test-template.yml --stack-name ${npm_config_stackname:=cfn-annex-test} --parameter-overrides FunctionName=cfn-annex EnableDebug=true",
     "lint": "eslint '*/*.js'",
-    "test": "mocha -R spec"
+    "test": "npm run lint && mocha -R spec"
   },
   "author": "Alex Gibson",
   "license": "Apache-2.0",
@@ -31,8 +31,9 @@
     "extends": "eslint-config-airbnb-base",
     "rules": {
       "no-console": "off",
-      "no-multi-spaces": "off",
-      "max-len": "off"
+      "strict": "off",
+      "max-len": "off",
+      "import/no-extraneous-dependencies": "off"
     }
   }
 }

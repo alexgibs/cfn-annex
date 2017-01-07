@@ -4,38 +4,61 @@ const crypto = require('crypto');
 const aws = require('aws-sdk');
 const cfnresponse = require('./cfn-response.js');
 
-function findKey(keyName, obj) {
-  let value;
-  if (obj instanceof Array) {
-    for (let i = 0; i < obj.length; i++) {
-      value = findKey(keyName, obj[i]);
-      if (value) break;
-    }
-  } else {
-    for (const key in obj) {
-      if (key === keyName) return obj[key];
-      if (obj[key] instanceof Object || obj[key] instanceof Array) {
-        value = findKey(keyName, obj[key]);
-        if (value) break;
+function helperFunctions() {
+  return {
+    regexEscape(str) {
+      return `[${str.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}]`;
+    },
+    regexReplace(str) {
+      return RegExp(this.regexEscape(str), 'g');
+    },
+    isObject(val) {
+      return typeof val === 'object';
+    },
+    isUndefined(val) {
+      return typeof val === 'undefined';
+    },
+    isNull(val) {
+      return !val && this.isObject(val);
+    },
+    isString(val) {
+      return typeof val === 'string';
+    },
+    isFunction(val) {
+      return typeof val === 'function';
+    },
+    isArray(val) {
+      return Array.isArray(val);
+    },
+    findValueByKey(keyName, obj) {
+      let val;
+      if (this.isArray(obj)) {
+        for (let i = 0; i < obj.length; i += 1) {
+          val = this.findValueByKey(keyName, obj[i]);
+          if (val) break;
+        }
+      } else {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const key in obj) {
+          if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            if (key === keyName) return obj[key];
+            if (this.isArray(obj[key]) || this.isObject(obj[key])) {
+              val = this.findValueByKey(keyName, obj[key]);
+              if (val) break;
+            }
+          }
+        }
       }
-    }
-  }
-  return value;
+      return val;
+    },
+  };
 }
-
-function regexEscape(str) {
-  return `[${str.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}]`;
-}
-
-function regexObject(data) {
-  return new RegExp(regexEscape(data), 'g');
-}
+// for brevity
+const _ = helperFunctions();
 
 exports.handler = (event, context) => {
   const input = event.ResourceProperties.input;
   const debug = !!(event.ResourceProperties.debug);
-
-  if (debug) console.log('Request Object: ', event);
 
   function signalCFN(err, data) {
     const physicalResourceId = event.PhysicalResourceId || `${event.ResourceProperties.fn}-${String(process.hrtime()[1])}`;
@@ -56,18 +79,14 @@ exports.handler = (event, context) => {
 
   function lowerCase(str) {
     return new Promise((resolve, reject) => {
-      if (typeof str !== 'string') {
-        reject('Input data is not a string.');
-      }
+      if (!_.isString(str)) reject('Input data is not a string.');
       resolve(str.toLowerCase());
     });
   }
 
   function upperCase(str) {
     return new Promise((resolve, reject) => {
-      if (typeof str !== 'string') {
-        reject('Input data is not a string.');
-      }
+      if (!_.isString(str)) reject('Input data is not a string.');
       resolve(str.toUpperCase());
     });
   }
@@ -84,10 +103,7 @@ exports.handler = (event, context) => {
 
   function splitStr(str, delimiter) {
     return new Promise((resolve, reject) => {
-      if (typeof str !== 'string' || typeof delimiter !== 'string') {
-        reject('Input data is not a string');
-      }
-
+      if (!_.isString(str) || !_.isString(delimiter)) reject('Input data is not a string');
       resolve(str.split(delimiter));
     });
   }
@@ -97,20 +113,19 @@ exports.handler = (event, context) => {
   */
   function removeChars(str, remove) {
     return new Promise((resolve, reject) => {
-      if (typeof str !== 'string') {
-        reject('Input data is not a string');
+      if (!_.isString(str)) reject('Input data is not a string');
+
+      let valueToRemove = remove;
+      if (_.isNull(valueToRemove) || _.isUndefined(valueToRemove)) {
+        valueToRemove = ' ';
       }
 
-      let rem = remove;
-      if (rem == null || rem === undefined) { rem = ' '; }
-
-      if (typeof rem === 'string') {
-        const regex = regexObject(rem);
+      if (_.isString(valueToRemove)) {
+        const regex = _.regexReplace(valueToRemove);
         resolve(str.replace(regex, ''));
       }
-
-      if (Array.isArray(rem)) {
-        const regex = regexObject(rem.join(''));
+      if (_.isArray(valueToRemove)) {
+        const regex = _.regexReplace(valueToRemove.join(''));
         resolve(str.replace(regex, ''));
       }
     });
@@ -138,17 +153,16 @@ exports.handler = (event, context) => {
     });
   }
 
-  // testing
   function describeAPICall(describeCall, params, responseKey) {
     return new Promise((resolve, reject) => {
-      // TODO: test if params are undefined here
-
+      if (!_.isString(describeCall) || !_.isString(responseKey)) reject('describeCall or responseKey is not a string.');
+      if (!_.isObject(params)) reject('Parameters should be an object');
       const apiCall = describeCall.split('.');
 
-      if (typeof aws[apiCall[0]] !== 'function') reject(`The service '${apiCall[0]}' is not valid. Please check http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/.`);
+      if (!_.isFunction(aws[apiCall[0]])) reject(`The service '${apiCall[0]}' is not valid. Please check http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/.`);
       const service = new aws[apiCall[0]]();
 
-      if (typeof service[apiCall[1]] !== 'function') reject(`The API Call '${apiCall[1]}' is not valid. Please check http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/.`);
+      if (!_.isFunction(service[apiCall[1]])) reject(`The API Call '${apiCall[1]}' is not valid. Please check http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/.`);
       service[apiCall[1]](params, (err, data) => {
         if (err) reject(err);
         const returnVal = responseKey.split('.');
@@ -160,7 +174,7 @@ exports.handler = (event, context) => {
           returnVal.forEach((key) => {
             response = response[key];
           });
-          if (response === undefined) {
+          if (_.isNull(response) || _.isUndefined(response)) {
             throw new Error('undefined');
           } else {
             value = response;
@@ -168,7 +182,7 @@ exports.handler = (event, context) => {
         } catch (e) {
           // attempt to traverse data object and returnVal find key
           if (returnVal.length === 1) {
-            value = findKey(returnVal[0], data);
+            value = _.findValueByKey(returnVal[0], data);
           } else {
             reject(`Unable to find key ${responseKey} from the ${describeCall} call.`);
           }
@@ -179,13 +193,13 @@ exports.handler = (event, context) => {
   }
 
   const actions = {
-    lowercase: ()               =>    lowerCase(input.string),
-    uppercase: ()               =>    upperCase(input.string),
-    split: ()                   =>    splitStr(input.string, input.delimiter),
-    remove: ()                  =>    removeChars(input.string, input.remove),
-    random: ()                  =>    randomChars(input.length),
-    pause: ()                   =>    sleep(input.duration),
-    describe: ()                =>    describeAPICall(input.describe, input.params, input.responseKey),
+    lowercase: () => lowerCase(input.string),
+    uppercase: () => upperCase(input.string),
+    split: () => splitStr(input.string, input.delimiter),
+    remove: () => removeChars(input.string, input.remove),
+    random: () => randomChars(input.length),
+    pause: () => sleep(input.duration),
+    describe: () => describeAPICall(input.describe, input.params, input.responseKey),
   };
 
   let response = {};

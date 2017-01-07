@@ -101,7 +101,7 @@ Resources:
           !Sub ${FunctionName}
       fn: describe
       input:
-        describe: CloudFormation.describeStackResource #will perform a describeStackResource API call
+        describe: CloudFormation.describeStackResource #will perform a CFN describeStackResource API call
         params:
           StackName: !Ref AWS::StackName
           LogicalResourceId: DescribeCall
@@ -116,7 +116,7 @@ Resources:
           !Sub ${FunctionName}
       fn: describe
       input:
-        describe: EC2.describeImages #will perform a describeStackResource API call
+        describe: EC2.describeImages #will perform an EC2 describeImages API call
         params:
           ImageIds: 
             - ami-1e299d7e

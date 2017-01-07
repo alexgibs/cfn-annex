@@ -9,7 +9,7 @@ const AWSRegion = helpers.AWSRegion;
 
 describe('== Test \'Create\' request event ==', () => {
   describe('*** Testing: PUT response correctly formed', () => {
-    it('Should have \'content-type\' set to empty, the LogicalResourceId specified and no PhysicalResourceId.', (done) => {
+    it('Should have \'content-type\' set to empty, the LogicalResourceId and PhysicalResourceId specified.', (done) => {
       const requestParams = {
         resourceProperties: {
           fn: 'lowercase',

@@ -35,8 +35,9 @@ Installing the cfn-annex Lambda function can be done either of the following met
   > Ensure you have npm and the aws cli installed.
 
   ``
-  npm run deploy --s3bucket="mybucket" --stack-name="cfn-annex"
+  npm run deploy --s3bucket="mybucket" --stackname="cfn-annex"
   ``
+  * Note: * The --stackname parameter is optional, it will use 'cfn-annex' as the stack name by default.
 
 **2. Deploying it directly as a Lambda function:**
 
@@ -52,6 +53,7 @@ This can be deployed with the following:
   ``
   npm run deploy:test --stackname="cfn-annex-test"
   ``
+  * Note: * The --stackname parameter is optional, it will use 'cfn-annex-test' as the stack name by default.
 
   The ARN of the Lambda function will be available in the stack outputs and also exported as 'cfn-annex' so that it can be imported in other stacks where required.
 
@@ -82,9 +84,9 @@ This can be deployed with the following:
         string: TESTING
 
 
-  # The response can be accessed via the Fn::GetAtt function:
-
-  !GetAtt Lowercase.response # would return 'testing'
+  # The response can be accessed via the Fn::GetAtt function.
+  # Returns 'testing':
+  !GetAtt Lowercase.response
   ```
 
   [⬆ back to top](#table-of-contents)
@@ -111,10 +113,9 @@ This can be deployed with the following:
       input:
         string: testing
 
-
-  # The response can be accessed via the Fn::GetAtt function:
-
-  !GetAtt Uppercase.response # would return 'TESTING'
+  # The response can be accessed via the Fn::GetAtt function.
+  # Returns 'TESTING':
+  !GetAtt Uppercase.response
   ```
 
   [⬆ back to top](#table-of-contents)
@@ -143,10 +144,9 @@ This can be deployed with the following:
         string: ab-c--def-g-
         delimiter: '-'
 
-
-  # The response can be accessed via the Fn::GetAtt function:
-
-  !GetAtt Split.response # would return '['ab','c','','def','g','']
+  # The response can be accessed via the Fn::GetAtt function.
+  # Returns '['ab','c','','def','g','']:
+  !GetAtt Split.response
   ```
 
   [⬆ back to top](#table-of-contents)
@@ -173,12 +173,12 @@ This can be deployed with the following:
       fn: remove
       input:
         string: ab-c--def-g-
-        remove: '-' # an array of multiple chars to remove could be specified here
+        # An array of multiple chars to remove could also be specified here:
+        remove: '-'
 
-
-  # The response can be accessed via the Fn::GetAtt function:
-
-  !GetAtt Split.remove # would return 'abcdefg'
+  # The response can be accessed via the Fn::GetAtt function.
+  # Returns 'abcdefg':
+  !GetAtt Split.remove
   ```
 
   [⬆ back to top](#table-of-contents)
@@ -205,10 +205,9 @@ This can be deployed with the following:
       input:
         length: 10
 
-
-  # The response can be accessed via the Fn::GetAtt function:
-
-  !GetAtt RandomChars.response # would return '38hr32974gf'
+  # The response can be accessed via the Fn::GetAtt function.
+  # Returns '38hr32974gf':
+  !GetAtt RandomChars.response
   ```
 
   [⬆ back to top](#table-of-contents)
@@ -218,7 +217,10 @@ This can be deployed with the following:
   <a name="stack-creation-helpers--pause"></a><a name="2.1"></a>
   - **[2.1](#stack-creation-helpers--pause) pause**
 
-  Causes CloudFormation to sleep or pause for a specified duration of time. This can be useful to introduce delay when eventual consistency is an issue.
+  Causes CloudFormation to sleep or pause for a specified duration of time.
+  This can be useful to introduce delay when eventual consistency is an issue.
+  The CloudFormation 'DependsOn' resource attribute can be used to explicitly define another resource should wait for the pause to finish before being created/updated/deleted.
+  http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-attribute-dependson.html
 
   Usage:
   ```
@@ -235,7 +237,8 @@ This can be deployed with the following:
       ServiceToken: ServiceToken: !ImportValue cfn-annex
       fn: pause
       input:
-        duration: 20000 # this will pause for 20seconds.
+        # This will pause for 20 seconds:
+        duration: 20000
   ```
 
   [⬆ back to top](#table-of-contents)
@@ -245,9 +248,11 @@ This can be deployed with the following:
   <a name="aws-api-helpers--describe"></a><a name="3.1"></a>
   - **[3.1](#aws-api-helpers--describe) describe**
 
-  Allows you to make a describe API call on another AWS Service from within your stack. For example, you may wish to find the SnapshotId of an AMI.
+  Allows you to make a describe API call on another AWS Service from within your stack.
+  In order to defined the required API call, parameters and response key, please refer to the AWS NodeJS SDK API Documentation: http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/
+  *Note: The API call, params and response key are all case sensitive.*
 
-  > Note, the cfn-annex Lambda function execution role must have the required permissions to perform the API action.
+  > Note, the cfn-annex Lambda function execution role must have the required permissions to perform the API action you specify.
 
   Usage:
   ```
@@ -258,6 +263,8 @@ This can be deployed with the following:
     responseKey: {string} the name of the key or the path to the key for the value you want returned
   ```
 
+  The following example demonstrates how to look up the root volume SnapshotId an AMI and make it available within your CloudFormation stack:
+
   Example CloudFormation Resource:
   ```yaml
   Describe:
@@ -266,24 +273,27 @@ This can be deployed with the following:
       ServiceToken: ServiceToken: !ImportValue cfn-annex
       fn: describe
       input:
-        describe: EC2.describeImages #will perform a describeStackResource API call
+        # Performs an EC2 describeImages() API call:
+        describe: EC2.describeImages
         params:
           ImageIds:
             - ami-123456
-        responseKey: Images.0.BlockDeviceMappings.0.Ebs.SnapshotId # the value you want returned, full path specified.
-        # responseKey: SnapshotId # this would return the value corresponding to the first 'SnapshotId' key foudn in the response.
+        # Full path defined for the response value (.0. defines the first object in an array):
+        responseKey: Images.0.BlockDeviceMappings.0.Ebs.SnapshotId
 
+        # Just the key name can also be used. This would return the value corresponding to the first 'SnapshotId' key found in the response:
+        # responseKey: SnapshotId
 
-  # The response can be accessed via the Fn::GetAtt function:
-
-  !GetAtt Describe.response # would return 'snapshot-12345678'
+  # The response can be accessed via the Fn::GetAtt function.
+  # Returns 'snapshot-12345678':
+  !GetAtt Describe.response
   ```
 
   [⬆ back to top](#table-of-contents)
 
 ## Debugging
 
-An optional 'debug' parameter can be parsed with any helper function. This will cause the cfn-annex Lambda function to output more verbose logs to its CloudWatch log group.
+An optional 'debug' parameter can be passed with any helper function. This will cause the cfn-annex Lambda function to output more verbose logs to its CloudWatch log group.
 
  Example:
   ```yaml
@@ -294,7 +304,8 @@ An optional 'debug' parameter can be parsed with any helper function. This will 
       fn: lowercase
       input:
         string: TESTING
-      debug: true # this enables debug logs for this instance of cfn-annex.
+      # Enables debug logs for this instance of cfn-annex:
+      debug: true
   ```
 
 ## Tests
@@ -312,5 +323,5 @@ Mocha tests can be run locally with:
 The test CloudFormation stack can be deployed with:
 
   ``
-  npm run deploy:test --stackname="cfn-annex-test"
+  npm run deploy:test  --stackname="cfn-annex-test"
   ``
