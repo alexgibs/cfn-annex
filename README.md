@@ -37,7 +37,8 @@ Installing the cfn-annex Lambda function can be done either of the following met
   ``
   npm run deploy --s3bucket="mybucket" --stackname="cfn-annex"
   ``
-  * Note: * The --stackname parameter is optional, it will use 'cfn-annex' as the stack name by default.
+  
+  *Note:* The --stackname parameter is optional, it will use 'cfn-annex' as the stack name by default.
 
 **2. Deploying it directly as a Lambda function:**
 
@@ -53,7 +54,8 @@ This can be deployed with the following:
   ``
   npm run deploy:test --stackname="cfn-annex-test"
   ``
-  * Note: * The --stackname parameter is optional, it will use 'cfn-annex-test' as the stack name by default.
+  
+  *Note:* The --stackname parameter is optional, it will use 'cfn-annex-test' as the stack name by default.
 
   The ARN of the Lambda function will be available in the stack outputs and also exported as 'cfn-annex' so that it can be imported in other stacks where required.
 
