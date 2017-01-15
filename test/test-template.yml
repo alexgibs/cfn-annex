@@ -1,15 +1,16 @@
-Parameters:
+Description: >
+  Test and reference template for cfn-annex.
 
+Parameters:
   FunctionName:
     Type: String
     Default: cfn-annex
   EnableDebug:
     Type: String
     Default: true
-    Description: Enable Lambda logging to CW
+    Description: Enable Lambda logging to CW.
 
 Resources:
-
   Lowercase:
     Type: Custom::Lowercase
     Properties:
@@ -128,38 +129,56 @@ Outputs:
   Lowercase:
     Description: Value returned from Custom::Lowercase
     Value: !GetAtt Lowercase.response
+    Export:
+      Name: cfn-annex-lowercase-test
   
   Uppercase:
     Description: Value returned from Custom::Uppercase
     Value: !GetAtt Uppercase.response
-  
+    Export:
+      Name: cfn-annex-uppercase-test
+
   Split:
-    Description: Value returned from Custom::Split (displaying only the first value from the list)
+    Description: Value returned from Custom::Split (list joined back with the '+' char, as output must be a string)
     Value: 
-      Fn::Select:
-        - 0
+      Fn::Join:
+        - +
         - !GetAtt Split.response
+    Export:
+      Name: cfn-annex-split-test
 
   RemoveSingleChar:
     Description: Value returned from Custom::RemoveSingleChar
     Value: !GetAtt RemoveSingleChar.response
+    Export: 
+      Name: cfn-annex-removesinglechar-test
 
   RemoveMultiChars:
     Description: Value returned from Custom::RemoveMultiChars
     Value: !GetAtt RemoveMultiChars.response
+    Export:
+      Name: cfn-annex-removemultichars-test
 
   RandomChars:
     Description: Value returned from Custom::RandomChars
     Value: !GetAtt RandomChars.response
+    Export:
+      Name: cfn-annex-randomchars-test
 
   Pause:
     Description: Value returned from Custom::Pause
     Value: !GetAtt Pause.response
+    Export:
+      Name: cfn-annex-pause-test
 
   DescribeCall:
     Description: Value returned from Custom::Describe (DescribeCall)
     Value: !GetAtt DescribeCall.response
+    Export:
+      Name: cfn-annex-describecall-test
 
   GetRootSnapshotIdFromAMI:
     Description: Value returned from Custom::Describe (GetRootSnapshotIdFromAMI)
     Value: !GetAtt GetRootSnapshotIdFromAMI.response
+    Export:
+      Name: cfn-annex-getrootsnapshotfromid-test

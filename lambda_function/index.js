@@ -24,6 +24,9 @@ function helperFunctions() {
     isString(val) {
       return typeof val === 'string';
     },
+    isNumber(val) {
+      return typeof val === 'number';
+    },
     isFunction(val) {
       return typeof val === 'function';
     },
@@ -57,6 +60,8 @@ function helperFunctions() {
 const _ = helperFunctions();
 
 exports.handler = (event, context) => {
+  aws.config.setPromisesDependency(null);
+  console.log(aws.config.getPromisesDependency());
   const input = event.ResourceProperties.input;
   const debug = !!(event.ResourceProperties.debug);
 
@@ -78,16 +83,16 @@ exports.handler = (event, context) => {
   }
 
   function lowerCase(str) {
-    return new Promise((resolve, reject) => {
-      if (!_.isString(str)) reject('Input data is not a string.');
-      resolve(str.toLowerCase());
+    return Promise.resolve().then(() => {
+      if (!_.isString(str)) throw new Error(`Input data: '${str}' is not a string.`);
+      return str.toLowerCase();
     });
   }
 
   function upperCase(str) {
-    return new Promise((resolve, reject) => {
-      if (!_.isString(str)) reject('Input data is not a string.');
-      resolve(str.toUpperCase());
+    return Promise.resolve().then(() => {
+      if (!_.isString(str)) throw new Error(`Input data: '${str}' is not a string.`);
+      return str.toUpperCase();
     });
   }
 
@@ -95,16 +100,17 @@ exports.handler = (event, context) => {
   * returns pseudo-random characters [a-z0-9] of 'length' long.
   */
   function randomChars(length) {
-    return new Promise((resolve) => {
+    return Promise.resolve().then(() => {
+      if (!_.isNumber(length)) throw new Error(`Input data: '${length}' is not a number.`);
       const len = Number(length);
-      resolve(crypto.randomBytes(len).toString('hex').substring(len));
+      return crypto.randomBytes(len).toString('hex').substring(len);
     });
   }
 
   function splitStr(str, delimiter) {
-    return new Promise((resolve, reject) => {
-      if (!_.isString(str) || !_.isString(delimiter)) reject('Input data is not a string');
-      resolve(str.split(delimiter));
+    return Promise.resolve().then(() => {
+      if (!_.isString(str) || !_.isString(delimiter)) throw new Error('Input data is not a string');
+      return str.split(delimiter);
     });
   }
 
@@ -112,22 +118,22 @@ exports.handler = (event, context) => {
   * 'remove' can be a string or array of chars to remove from 'str'.
   */
   function removeChars(str, remove) {
-    return new Promise((resolve, reject) => {
-      if (!_.isString(str)) reject('Input data is not a string');
+    return Promise.resolve().then(() => {
+      if (!_.isString(str)) throw new Error(`Input data ${str} is not a string`);
 
       let valueToRemove = remove;
       if (_.isNull(valueToRemove) || _.isUndefined(valueToRemove)) {
         valueToRemove = ' ';
       }
-
       if (_.isString(valueToRemove)) {
         const regex = _.regexReplace(valueToRemove);
-        resolve(str.replace(regex, ''));
+        return str.replace(regex, '');
       }
       if (_.isArray(valueToRemove)) {
         const regex = _.regexReplace(valueToRemove.join(''));
-        resolve(str.replace(regex, ''));
+        return str.replace(regex, '');
       }
+      return str;
     });
   }
 
@@ -137,16 +143,15 @@ exports.handler = (event, context) => {
   * errors if 'duration' is greater than the Lambda function configured exec time.
   */
   function sleep(duration) {
-    if (debug) console.log(duration);
-    return new Promise((resolve, reject) => {
+    if (debug) console.log(`Sleep for: ${duration}ms`);
+    return new Promise((resolve) => {
       if (duration >= 300000) {
-        reject('The specified pause duration exceeds the maximum allowed Lambda Function execution time.');
+        throw new Error('The specified pause duration exceeds the maximum allowed Lambda Function execution time.');
       }
 
       if (duration >= context.getRemainingTimeInMillis()) {
-        reject('The specified pause duration exceeds the Lambda Function execution time set.');
+        throw new Error('The specified pause duration exceeds the Lambda Function execution time set.');
       }
-
       setTimeout(() => {
         resolve(`Slept for ${duration}ms`);
       }, duration);
@@ -154,42 +159,40 @@ exports.handler = (event, context) => {
   }
 
   function describeAPICall(describeCall, params, responseKey) {
-    return new Promise((resolve, reject) => {
-      if (!_.isString(describeCall) || !_.isString(responseKey)) reject('describeCall or responseKey is not a string.');
-      if (!_.isObject(params)) reject('Parameters should be an object');
-      const apiCall = describeCall.split('.');
+    // return new Promise((resolve) => {
+    if (!_.isString(describeCall) || !_.isString(responseKey)) return Promise.reject('describeCall or responseKey is not a string.');
+    if (!_.isObject(params)) return Promise.reject('Parameters should be an object');
+    const apiCall = describeCall.split('.');
 
-      if (!_.isFunction(aws[apiCall[0]])) reject(`The service '${apiCall[0]}' is not valid. Please check http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/.`);
-      const service = new aws[apiCall[0]]();
+    if (!_.isFunction(aws[apiCall[0]])) return Promise.reject(`The service '${apiCall[0]}' is not valid. Please check http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/.`);
+    const service = new aws[apiCall[0]]();
 
-      if (!_.isFunction(service[apiCall[1]])) reject(`The API Call '${apiCall[1]}' is not valid. Please check http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/.`);
-      service[apiCall[1]](params, (err, data) => {
-        if (err) reject(err);
-        const returnVal = responseKey.split('.');
-        let response = data;
-        let value;
-        try {
-          // try to access the returnVal key from the data obj, e.g. data[StackResourceDetail][LastUpdatedTimestamp]
-          // if not found, should traverse the data object for the key
-          returnVal.forEach((key) => {
-            response = response[key];
-          });
-          if (_.isNull(response) || _.isUndefined(response)) {
-            throw new Error('undefined');
-          } else {
-            value = response;
-          }
-        } catch (e) {
-          // attempt to traverse data object and returnVal find key
-          if (returnVal.length === 1) {
-            value = _.findValueByKey(returnVal[0], data);
-          } else {
-            reject(`Unable to find key ${responseKey} from the ${describeCall} call.`);
-          }
+    if (!_.isFunction(service[apiCall[1]])) return Promise.reject(`The API Call '${apiCall[1]}' is not valid. Please check http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/.`);
+    const reqpromise = service[apiCall[1]](params).promise();
+    return reqpromise.then((data) => {
+      // if (err) console.log(err);
+      const returnVal = responseKey.split('.');
+      let response = data;
+      let value;
+      try {
+        // try to access the returnVal key from the data obj, e.g. data[StackResourceDetail][LastUpdatedTimestamp]
+        // if not found, should traverse the data object for the key
+        returnVal.forEach((key) => {
+          response = response[key];
+        });
+        if (_.isNull(response) || _.isUndefined(response)) throw new Error('response is empty');
+        value = response;
+      } catch (e) {
+        // attempt to traverse data object and returnVal find key
+        if (returnVal.length === 1) {
+          value = _.findValueByKey(returnVal[0], data);
+        } else {
+          return Promise.reject((`Unable to find key ${responseKey} from the ${describeCall} call.`));
         }
-        resolve(value);
-      });
+      }
+      return Promise.resolve(value);
     });
+    // });
   }
 
   const actions = {

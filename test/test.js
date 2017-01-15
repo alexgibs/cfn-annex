@@ -270,7 +270,7 @@ describe('== Testing individual functions ==', () => {
       };
       const responseParms = {
         responseStatus: helpers.responseStatusFAILED,
-        responseData: { error: 'Error occurred: The specified pause duration exceeds the maximum allowed Lambda Function execution time.' },
+        responseData: { error: 'Error occurred: Error: The specified pause duration exceeds the maximum allowed Lambda Function execution time.' },
       };
 
       helpers.mockCustomResource(requestParams, responseParms).then(() => {
@@ -292,7 +292,7 @@ describe('== Testing individual functions ==', () => {
       };
       const responseParms = {
         responseStatus: helpers.responseStatusFAILED,
-        responseData: { error: 'Error occurred: The specified pause duration exceeds the Lambda Function execution time set.' },
+        responseData: { error: 'Error occurred: Error: The specified pause duration exceeds the Lambda Function execution time set.' },
       };
 
       helpers.mockCustomResource(requestParams, responseParms).then(() => {
