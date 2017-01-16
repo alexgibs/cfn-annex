@@ -1,7 +1,7 @@
 const nock = require('nock');
 const index = require('../lambda_function/index.js');
 
-const enableDebug = true;
+const enableDebug = false;
 const AWSRegion = 'us-west-2';
 
 const lambdaMaxTimeout = 300000;

@@ -4,6 +4,9 @@ const crypto = require('crypto');
 const aws = require('aws-sdk');
 const cfnresponse = require('./cfn-response.js');
 
+// Comment out for now, see: https://github.com/aws/aws-sdk-js/commit/7c3760780a23eed98548261cc8245b3d1d260e40
+// aws.config.setPromisesDependency(null);
+
 function helperFunctions() {
   return {
     regexEscape(str) {
@@ -24,8 +27,8 @@ function helperFunctions() {
     isString(val) {
       return typeof val === 'string';
     },
-    isNumber(val) {
-      return typeof val === 'number';
+    isPositiveInt(val) {
+      return (val >>> 0 === Number(val)) && (Number(val) > 0);
     },
     isFunction(val) {
       return typeof val === 'function';
@@ -60,8 +63,6 @@ function helperFunctions() {
 const _ = helperFunctions();
 
 exports.handler = (event, context) => {
-  aws.config.setPromisesDependency(null);
-  console.log(aws.config.getPromisesDependency());
   const input = event.ResourceProperties.input;
   const debug = !!(event.ResourceProperties.debug);
 
@@ -101,7 +102,7 @@ exports.handler = (event, context) => {
   */
   function randomChars(length) {
     return Promise.resolve().then(() => {
-      if (!_.isNumber(length)) throw new Error(`Input data: '${length}' is not a number.`);
+      if (!_.isPositiveInt(length)) throw new Error(`Input data: '${length}' is not a positive integer.`);
       const len = Number(length);
       return crypto.randomBytes(len).toString('hex').substring(len);
     });
@@ -145,6 +146,8 @@ exports.handler = (event, context) => {
   function sleep(duration) {
     if (debug) console.log(`Sleep for: ${duration}ms`);
     return new Promise((resolve) => {
+      if (!_.isPositiveInt(duration)) throw new Error(`Input data: '${duration}' is not a positive integer.`);
+
       if (duration >= 300000) {
         throw new Error('The specified pause duration exceeds the maximum allowed Lambda Function execution time.');
       }
@@ -158,8 +161,11 @@ exports.handler = (event, context) => {
     });
   }
 
+  /*
+  * This does not actually make any attempts to ensure the API call being made is non-mutating,
+  * so any call is theoretically possible if the Lambda exec role has permission.
+  */
   function describeAPICall(describeCall, params, responseKey) {
-    // return new Promise((resolve) => {
     if (!_.isString(describeCall) || !_.isString(responseKey)) return Promise.reject('describeCall or responseKey is not a string.');
     if (!_.isObject(params)) return Promise.reject('Parameters should be an object');
     const apiCall = describeCall.split('.');
@@ -167,13 +173,12 @@ exports.handler = (event, context) => {
     if (!_.isFunction(aws[apiCall[0]])) return Promise.reject(`The service '${apiCall[0]}' is not valid. Please check http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/.`);
     const service = new aws[apiCall[0]]();
 
-    if (!_.isFunction(service[apiCall[1]])) return Promise.reject(`The API Call '${apiCall[1]}' is not valid. Please check http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/.`);
-    const reqpromise = service[apiCall[1]](params).promise();
-    return reqpromise.then((data) => {
-      // if (err) console.log(err);
+    if (!_.isFunction(service[apiCall[1]]().promise)) return Promise.reject(`The API Call '${apiCall[1]}' is not valid. Please check http://docs.aws.amazon.com/AWSJavaScriptSDK/latest/.`);
+
+    const request = service[apiCall[1]](params).promise();
+    return request.then((data) => {
       const returnVal = responseKey.split('.');
       let response = data;
-      let value;
       try {
         // try to access the returnVal key from the data obj, e.g. data[StackResourceDetail][LastUpdatedTimestamp]
         // if not found, should traverse the data object for the key
@@ -181,18 +186,16 @@ exports.handler = (event, context) => {
           response = response[key];
         });
         if (_.isNull(response) || _.isUndefined(response)) throw new Error('response is empty');
-        value = response;
       } catch (e) {
         // attempt to traverse data object and returnVal find key
         if (returnVal.length === 1) {
-          value = _.findValueByKey(returnVal[0], data);
+          response = _.findValueByKey(returnVal[0], data);
         } else {
           return Promise.reject((`Unable to find key ${responseKey} from the ${describeCall} call.`));
         }
       }
-      return Promise.resolve(value);
+      return Promise.resolve(response);
     });
-    // });
   }
 
   const actions = {
