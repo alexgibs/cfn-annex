@@ -109,21 +109,107 @@ Resources:
         responseKey: ResourceType
       debug: EnableDebug
 
-  GetRootSnapshotIdFromAMI:
-    Type: Custom::Describe
-    Properties:
-      ServiceToken:
-        Fn::ImportValue: 
-          !Sub ${FunctionName}
-      fn: describe
-      input:
-        describe: EC2.describeImages #will perform an EC2 describeImages API call
-        params:
-          ImageIds: 
-            - ami-1e299d7e
-        responseKey: Images.0.BlockDeviceMappings.0.Ebs.SnapshotId # .0. is used to access the first element in the array
-        # Because there is only 1 volume attached, we could just specify 'SnapshotId', without the full path. It will return the fist found.
-      debug: EnableDebug
+
+
+  ## Example of using the describe call and specifying a full path to the return value.
+  ## Uncomment resource and specify an AMI Id to test.
+
+  # GetRootSnapshotIdFromAMI:
+  #   Type: Custom::Describe
+  #   Properties:
+  #     ServiceToken:
+  #       Fn::ImportValue: 
+  #         !Sub ${FunctionName}
+  #     fn: describe
+  #     input:
+  #       describe: EC2.describeImages #will perform an EC2 describeImages API call
+  #       params:
+  #         ImageIds: 
+  #           - <AMI Id>
+  #       responseKey: Images.0.BlockDeviceMappings.0.Ebs.SnapshotId # .0. is used to access the first element in the array
+  #       # Because there is only 1 volume attached, we could just specify 'SnapshotId', without the full path. It will return the fist found.
+  #     debug: EnableDebug
+
+
+
+  ## Example of tagging an instance root volume.
+  ## Uncomment resources and specify an AMI id to test.
+
+  # MyEC2Instance: 
+  #   Type: AWS::EC2::Instance
+  #   Properties: 
+  #     ImageId: <AMI Id>
+  #     InstanceType: t2.large
+  #     BlockDeviceMappings: 
+  #       - DeviceName: "/dev/sdm"
+  #         Ebs: 
+  #           VolumeType: "io1"
+  #           Iops: "200"
+  #           DeleteOnTermination: "false"
+  #           VolumeSize: "20"
+  #       - DeviceName: "/dev/sdk"
+  #         Ebs:
+  #           VolumeType: "io1"
+  #           Iops: "200"
+  #           VolumeSize: "20"
+
+  # TagInstaceRootVol:
+  #   Type: Custom::Tag
+  #   Properties:
+  #     ServiceToken:
+  #       Fn::ImportValue: 
+  #         !Sub ${FunctionName}
+  #     fn: tag
+  #     input:
+  #       tags: 
+  #         - Key: cfnAnnex
+  #           Value: testValue
+  #       resource: !Ref MyEC2Instance
+  #     debug: EnableDebug
+
+
+
+  ## Example ASG using cfn-annex to tag instance root volumes.
+  ## Uncomment resources and specify the latest Amazon Linux AMI and an instance profile to test.
+
+  # ASG:
+  #   Type: AWS::AutoScaling::AutoScalingGroup
+  #   Properties:
+  #     AvailabilityZones:
+  #       Fn::GetAZs: 
+  #         Ref: "AWS::Region"
+  #     LaunchConfigurationName: 
+  #       Ref: LaunchConfiguration
+  #     MaxSize: 1
+  #     MinSize: 1
+
+  # LaunchConfiguration:
+  #   Type: AWS::AutoScaling::LaunchConfiguration
+  #   Properties: 
+  #     ImageId: <Amazon Linux AMI>
+  #     InstanceType: t2.large
+  #     IamInstanceProfile: <arn of instance profile>
+  #     BlockDeviceMappings: 
+  #       - DeviceName: "/dev/sdm"
+  #         Ebs: 
+  #           VolumeType: "io1"
+  #           Iops: "200"
+  #           DeleteOnTermination: "false"
+  #           VolumeSize: "20"
+  #       - DeviceName: "/dev/sdk"
+  #         Ebs:
+  #           VolumeType: "io1"
+  #           Iops: "200"
+  #           VolumeSize: "20"
+  #     UserData:
+  #       Fn::Base64:
+  #         !Sub
+  #         - | 
+  #           #!/bin/bash -xe
+  #           yum install aws-cli
+  #           INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id)
+  #           aws lambda invoke --region ${AWS::Region} --function-name ${Function} --invocation-type Event --payload "{ \"ResourceProperties\": { \"fn\": \"tag\", \"input\": { \"resource\": \"${!INSTANCE_ID}\", \"tags\": [ { \"Key\": \"myKeyName\", \"Value\": \"myKeyValue\" } ] } } }" outputfile
+  #         - { Function: !ImportValue cfn-annex }
 
 Outputs:
   Lowercase:

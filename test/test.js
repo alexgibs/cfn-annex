@@ -422,4 +422,82 @@ describe('== Testing individual functions ==', () => {
       }).catch((d) => { console.log(d); });
     });
   });
+
+  // Tagging tests
+
+  describe('*** Testing: Tagging function', () => {
+    it('Should tag EC2 instance root volume.', (done) => {
+      const instanceId = 'i-1234567890abcdefg';
+      const volumeId = 'vol-1234567890abcdefg';
+      const testKey = 'TestKey';
+      const testValue = 'TestValue';
+
+      const requestParams = {
+        resourceProperties: {
+          fn: 'tag',
+          input: {
+            resource: instanceId,
+            tags: [{
+              Key: testKey,
+              Value: testValue,
+            }],
+          },
+          debug: enableDebug,
+        },
+        requestType: helpers.requestTypeCreate,
+      };
+      const responseParms = {
+        responseStatus: helpers.responseStatusSUCCESS,
+        responseData: {},
+      };
+
+      nock(`https://ec2.${AWSRegion}.amazonaws.com:443`, { encodedQueryParams: true })
+        .post('/', `Action=DescribeVolumes&Filter.1.Name=attachment.instance-id&Filter.1.Value.1=${instanceId}&Version=2016-11-15`)
+        .reply(200, `<?xml version='1.0' encoding='UTF-8'?>
+      <DescribeVolumesResponse xmlns='http://ec2.amazonaws.com/doc/2016-11-15/'>
+        <requestId>2410e520-f420-46b9-932e-714898fc1649</requestId>
+        <volumeSet>
+            <item>
+                <volumeId>${volumeId}</volumeId>
+                <size>8</size>
+                <snapshotId>snap-0123456</snapshotId>
+                <availabilityZone>${AWSRegion}a</availabilityZone>
+                <status>in-use</status>
+                <createTime>2016-11-23T04:57:26.446Z</createTime>
+                <attachmentSet>
+                    <item>
+                        <volumeId>${volumeId}</volumeId>
+                        <instanceId>${instanceId}</instanceId>
+                        <device>/dev/sda1</device>
+                        <status>attached</status>
+                        <attachTime>2016-11-23T04:57:26.000Z</attachTime>
+                        <deleteOnTermination>true</deleteOnTermination>
+                    </item>
+                </attachmentSet>
+                <tagSet>
+                </tagSet>
+                <volumeType>gp2</volumeType>
+                <iops>100</iops>
+                <encrypted>false</encrypted>
+            </item>
+        </volumeSet>
+      </DescribeVolumesResponse>`)
+        .log((d) => { if (enableDebug) console.log(d); });
+
+      nock(`https://ec2.${AWSRegion}.amazonaws.com:443`, { encodedQueryParams: true })
+        .post('/', `Action=CreateTags&ResourceId.1=${volumeId}&Tag.1.Key=${testKey}&Tag.1.Value=${testValue}&Version=2016-11-15`)
+        .reply(403, `<?xml version='1.0' encoding='UTF-8'?>
+      <CreateTagsResponse xmlns='http://ec2.amazonaws.com/doc/2016-11-15/'>
+        <requestId>620fd359-9d9e-42e0-bd12-8004e7684298</requestId>
+        <return>true</return>
+      </CreateTagsResponse>`)
+        .log((d) => { if (enableDebug) console.log(d); });
+
+      helpers.mockCustomResource(requestParams, responseParms)
+        .then(() => {
+          assert(nock.isDone());
+          done();
+        }).catch((d) => { console.log('Error caught: ', d); });
+    });
+  });
 });

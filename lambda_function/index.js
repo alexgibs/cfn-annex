@@ -85,14 +85,14 @@ exports.handler = (event, context) => {
 
   function lowerCase(str) {
     return Promise.resolve().then(() => {
-      if (!_.isString(str)) throw new Error(`Input data: '${str}' is not a string.`);
+      if (!_.isString(str)) throw new Error('The string specified is not a valid string.');
       return str.toLowerCase();
     });
   }
 
   function upperCase(str) {
     return Promise.resolve().then(() => {
-      if (!_.isString(str)) throw new Error(`Input data: '${str}' is not a string.`);
+      if (!_.isString(str)) throw new Error('The string specified is not a valid string.');
       return str.toUpperCase();
     });
   }
@@ -102,12 +102,13 @@ exports.handler = (event, context) => {
   */
   function randomChars(length) {
     return Promise.resolve().then(() => {
-      if (!_.isPositiveInt(length)) throw new Error(`Input data: '${length}' is not a positive integer.`);
+      if (!_.isPositiveInt(length)) throw new Error('The length specified is not a positive integer.');
       const len = Number(length);
       return crypto.randomBytes(len).toString('hex').substring(len);
     });
   }
 
+  // To be deprecated as CFN now has direct support for Fn::Split  
   function splitStr(str, delimiter) {
     return Promise.resolve().then(() => {
       if (!_.isString(str) || !_.isString(delimiter)) throw new Error('Input data is not a string');
@@ -120,7 +121,7 @@ exports.handler = (event, context) => {
   */
   function removeChars(str, remove) {
     return Promise.resolve().then(() => {
-      if (!_.isString(str)) throw new Error(`Input data ${str} is not a string`);
+      if (!_.isString(str)) throw new Error('The string specified is not a string');
 
       let valueToRemove = remove;
       if (_.isNull(valueToRemove) || _.isUndefined(valueToRemove)) {
@@ -146,7 +147,7 @@ exports.handler = (event, context) => {
   function sleep(duration) {
     if (debug) console.log(`Sleep for: ${duration}ms`);
     return new Promise((resolve) => {
-      if (!_.isPositiveInt(duration)) throw new Error(`Input data: '${duration}' is not a positive integer.`);
+      if (!_.isPositiveInt(duration)) throw new Error('The duration specified is not a positive integer.');
 
       if (duration >= 300000) {
         throw new Error('The specified pause duration exceeds the maximum allowed Lambda Function execution time.');
@@ -198,6 +199,38 @@ exports.handler = (event, context) => {
     });
   }
 
+  function tagResources(resource, tags) {
+    if (!_.isString(resource)) return Promise.reject('The resource specified is not a string.');
+    if (!_.isArray(tags)) return Promise.reject('The tags specified are not an array.');
+    // ensure tags are correctly formatted
+    const parsedTags = tags.map(tag => {
+      if (tag.hasOwnProperty('Key') && tag.hasOwnProperty('Value')) {
+        return { Key: tag.Key, Value: tag.Value };
+      }
+      return undefined;
+    }).filter(noUndef => noUndef);
+    if (parsedTags.length < 1) return Promise.reject('The tags specified are not valid.');
+
+    // Check if Instacne resource and tag all volumes
+    if (resource.match(/^i-\w*/)) {
+      const ec2 = new aws.EC2();
+      return ec2.describeVolumes({
+        Filters: [{
+          Name: 'attachment.instance-id',
+          Values: [resource],
+        }],
+      }).promise()
+        .then(data => data.Volumes.map(volumes => volumes.VolumeId))
+        .then((volumes) => {
+          return ec2.createTags({
+            Tags: parsedTags,
+            Resources: volumes,
+          }).promise();
+        });
+    }
+    return Promise.reject('Instance Id not specified.');
+  }
+
   const actions = {
     lowercase: () => lowerCase(input.string),
     uppercase: () => upperCase(input.string),
@@ -206,6 +239,7 @@ exports.handler = (event, context) => {
     random: () => randomChars(input.length),
     pause: () => sleep(input.duration),
     describe: () => describeAPICall(input.describe, input.params, input.responseKey),
+    tag: () => tagResources(input.resource, input.tags),
   };
 
   let response = {};
@@ -215,6 +249,7 @@ exports.handler = (event, context) => {
     response.then((res) => {
       signalCFN(null, res);
     }).catch((err) => {
+      console.log(`Error occurred: ${err}`);
       signalCFN(`Error occurred: ${err}`);
     });
   } else {

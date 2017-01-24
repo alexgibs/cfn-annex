@@ -12,13 +12,14 @@ cfn-annex adds functionality to CloudFormation, such as being able to split a st
 - [Template Syntax helpers](#syntax-helpers)
   * [lowercase](#syntax-helpers--lowercase)
   * [uppercase](#syntax-helpers--uppercase)
-  * [split](#syntax-helpers--split)
+  * [split](#syntax-helpers--split) - now natively supported via cfn, will be deprecated. See http://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-split.html
   * [remove](#syntax-helpers--remove)
   * [random](#syntax-helpers--random)
 - [Stack Creation helpers](#stack-creation-helpers)
   * [pause](#stack-creation-helpers--pause)
-- [AWS API helpers](#aws-api-helpers)
-  * [describe](#aws-api-helpers--describe)
+- [AWS Resource helpers](#aws-resource-helpers)
+  * [describe](#aws-resource-helpers--describe)
+  * [tag](#aws-resource-helpers--tag)
 - [Debugging](#debugging)
 - [Tests](#tests)
 
@@ -291,6 +292,55 @@ This can be deployed with the following:
   !GetAtt Describe.response
   ```
 
+  <a name="aws-api-helpers--tag"></a><a name="3.2"></a>
+  - **[3.1](#aws-api-helpers--tag) tag**
+
+  Adds tags to EC2 Instance root EBS volumes and EBS volumes attached via BlockDeviceMappings.
+  Support for VPC default resources will be added soon.
+
+  > Note, the cfn-annex Lambda function execution role must have the required permissions to create tags on resources.
+  > If used in an autoscaling group, the EC2 instances must have permission to invoke the cfn-annex function.
+
+  Usage:
+  ```
+  fn: 'tag'
+  input:
+    resouce: {string} the instance id, e.g. i-1234567
+    tags: {list of key value pairs} list of 'Key' and 'Value' tag pairs
+  ```
+
+  Example CloudFormation Resource - tagging a single EC2 Instance volumes:
+  ```yaml
+  Describe:
+    Type: Custom::Tag
+    Properties:
+      ServiceToken: ServiceToken: !ImportValue cfn-annex
+      fn: tag
+      input:
+        resource: i-12345678910
+        tags:
+          - Key: myTagName
+          - Value: myTagValue
+  ```
+
+  Example CloudFormation Resource - tagging AutoScaled Instance volumes:
+  ```yaml
+  LaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: ami-123456
+      UserData:
+        Fn::Base64:
+          Fn::ImportValue:
+            !Sub
+              - |
+                #!/bin/bash -xe
+                yum install aws-cli
+                INSTANCE_ID=$(curl http://169.254.169.254/latest/meta-data/instance-id)
+                aws lambda invoke --region ${AWS::Region} --function-name ${Function} --invocation-type Event --payload "{ \"ResourceProperties\": { \"fn\": \"tag\", \"input\": { \"resource\": \"${!INSTANCE_ID}\", \"tags\": [ { \"Key\": \"myKeyName\", \"Value\": \"myKeyValue\" } ] } } }" outputfile
+              - { Function: !ImportValue cfn-annex }
+  ```
+
   [⬆ back to top](#table-of-contents)
 
 ## Debugging
@@ -311,6 +361,10 @@ An optional 'debug' parameter can be passed with any helper function. This will 
   ```
 
 ## Tests
+
+All API endpoints, including the S3 pre-signed url for signaling the custom resource are mocked using 'nock' <https://github.com/node-nock/nock>.
+
+To enable debug logs when running tests, set 'enableDebug' to true in the test/helpers.js file.
 
 Mocha tests can be run locally with:
 
